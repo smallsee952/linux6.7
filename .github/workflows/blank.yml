@@ -1,4 +1,4 @@
-name: CI
+name: Build Linux kernel 6.7 for Ubuntu 20.04
 
 on:
   push:
@@ -7,32 +7,41 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      - name: 安装依赖项
-        run: |
-          sudo apt-get update
-          sudo apt-get install build-essential wget git -y
-          sudo apt-get build-dep linux -y
+    - name: Set up Ubuntu 20.04 environment
+      uses: actions/setup-ubuntu@v1
+      with:
+        dist: focal
 
-      - name: 克隆内核仓库
-        run: |
-          git clone https://github.com/zabbly/linux.git
-          cd linux
-          git checkout linux-6.7
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev libssl-dev libelf-dev bison flex
 
-      - name: 配置内核
-        run: |
-          make defconfig
+    - name: Download kernel source code
+      run: |
+        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.7.tar.xz
+        tar xf linux-6.7.tar.xz
+        cd linux-6.7
 
-      - name: 编译内核
-        run: |
-          debian/rules do_tools=true binary-generic binary
-          mkdir -p /packages && cp -f../*deb /packages/.
+    - name: Configure kernel
+      run: |
+        make ARCH=x86_64 CROSS_COMPILE=x86_64-linux-gnu-
+        make -j $(nproc) deb-pkg
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: linux_package
-          path: /packages/
+    - name: Upload compiled files as artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: kernel-compiled
+        path: linux-6.7/*.deb
+
+    - name: Upload kernel config as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: kernel-config
+        path: linux-6.7/.config
