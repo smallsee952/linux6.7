@@ -1,4 +1,4 @@
-name: Build kernel deb packages
+name: CI
 
 on:
   push:
@@ -7,22 +7,32 @@ on:
 
 jobs:
   build:
-    name: Build kernel
     runs-on: ubuntu-20.04
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@master
+      - uses: actions/checkout@v3
+
+      - name: 安装依赖项
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential wget git -y
+          sudo apt-get build-dep linux -y
+
+      - name: 克隆内核仓库
+        run: |
+          git clone https://github.com/zabbly/linux.git
+          cd linux
+          git checkout linux-6.7
+
+      - name: 配置内核
+        run: |
+          make defconfig
+
+      - name: 编译内核
+        run: |
+          debian/rules do_tools=true binary-generic binary
+          mkdir -p /packages && cp -f../*deb /packages/.
+
+      - uses: actions/upload-artifact@v3
         with:
-          root-reserve-mb: 4096
-          swap-size-mb: 512
-          remove-dotnet: 'true'
-          remove-android: 'true'
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Build
-        run: bash build_action.sh
-      - name: Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: artifact
-          path: ${{ github.workspace }}/artifact/
+          name: linux_package
+          path: /packages/
